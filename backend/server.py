@@ -2332,7 +2332,7 @@ async def ui_agent_mempalace_status():
 
 @app.get("/api/modules")
 async def list_modules(enabled_only: bool = False):
-    """List v16 core and booster modules from the shared manifest."""
+    """List core and booster modules from the shared manifest."""
     try:
         manifest = module_service.load_manifest()
         return {

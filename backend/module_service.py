@@ -4,7 +4,7 @@ from typing import Any, Dict, List, Optional
 
 
 class ModuleService:
-    """Read the v16 module manifest and resolve workflow/module ownership."""
+    """Read the module manifest (core + boosters) and resolve workflow/module ownership."""
 
     def __init__(self, config_dir: Optional[Path] = None):
         self.config_dir = config_dir or Path(__file__).resolve().parent.parent / "config"

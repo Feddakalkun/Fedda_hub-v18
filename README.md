@@ -20,7 +20,7 @@ Current module ownership lives in:
 config\modules.json
 ```
 
-v18 begins with a clean minimal git-repo (source of truth) + separate install/ test tree. The modular foundation (core + boosters) from v16 is preserved.: modules describe ownership and guide installer node selection, but heavy workflow code has not been physically moved yet.
+v18 begins with a clean minimal git-repo (source of truth) + separate install/ test tree. The modular foundation (core + boosters) from the v16 pass is preserved. Modules describe ownership and guide installer node selection, but heavy workflow code has not been physically moved yet.
 
 ## Install layout
 
@@ -41,7 +41,7 @@ https://github.com/Feddakalkun/Fedda_hub-v18
 
 into `install\app`, then runs `scripts\install.bat LITE`.
 
-That same repository is the active v16 development remote.
+That same repository is the active v18 development remote.
 
 ## Runtime policy
 
