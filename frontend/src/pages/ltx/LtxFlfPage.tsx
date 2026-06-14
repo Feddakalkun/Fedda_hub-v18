@@ -10,6 +10,7 @@ import { comfyService } from '../../services/comfyService';
 import { FeddaButton, FeddaSectionTitle } from '../../components/ui/FeddaPrimitives';
 import { WorkflowWorkbench } from '../../components/layout/WorkflowWorkbench';
 import { WorkflowVideoPreviewStrip } from '../../components/layout/WorkflowVideoPreviewStrip';
+import { LTX_RATIOS, getLtxDimensions, getSafeLtxAspect } from '../../config/ltx';
 
 function FrameSlot({ label, preview, uploading, onFile }: {
   label: string;
@@ -89,7 +90,7 @@ export const LtxFlfPage = () => {
 
   const firstPreview = firstFilename ? `/comfy/view?filename=${encodeURIComponent(firstFilename)}&type=input` : null;
   const lastPreview = lastFilename ? `/comfy/view?filename=${encodeURIComponent(lastFilename)}&type=input` : null;
-  const ratios = ['1:1', '4:3', '3:4', '16:9', '9:16', '21:9', '3:2', '2:3'];
+  const ratios = LTX_RATIOS;
 
   useEffect(() => {
     comfyService.getLoras().then((loras) => {
@@ -123,12 +124,16 @@ export const LtxFlfPage = () => {
 
   const handleGenerate = () => {
     if (!firstFilename || !lastFilename || !prompt.trim() || run.isGenerating) return;
+    const dims = getLtxDimensions(aspectRatio);
+    const safeAspect = getSafeLtxAspect(aspectRatio);
     run.start({
       image_first: firstFilename,
       image_last: lastFilename,
       prompt: prompt.trim(),
-      aspect_ratio: aspectRatio,
+      aspect_ratio: safeAspect,
       direction,
+      width: dims.width,
+      height: dims.height,
       length_seconds: lengthSec,
       seed: seed === -1 ? Math.floor(Math.random() * 10_000_000_000) : seed,
       guide_strength_first: guideFirst,
@@ -212,6 +217,9 @@ export const LtxFlfPage = () => {
                   {ratio}
                 </button>
               ))}
+            </div>
+            <div className="text-[10px] font-mono text-white/40">
+              Output size: {getLtxDimensions(aspectRatio).width}×{getLtxDimensions(aspectRatio).height} (×32)
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2">

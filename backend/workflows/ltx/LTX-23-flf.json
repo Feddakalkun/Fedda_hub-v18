@@ -564,9 +564,9 @@
   },
   "5645": {
     "inputs": {
-      "width": 720,
-      "height": 720,
-      "aspect_ratio": "1:1",
+      "width": 1280,
+      "height": 704,
+      "aspect_ratio": "16:9",
       "direction": "Horizontal"
     },
     "class_type": "AspectRatioImageSize",

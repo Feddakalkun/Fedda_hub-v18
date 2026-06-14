@@ -965,6 +965,18 @@
                                                      "type":  "string",
                                                      "label":  "Direction"
                                                  },
+                                   "width":  {
+                                                 "node_id":  "5645",
+                                                 "input_key":  "width",
+                                                 "type":  "number",
+                                                 "label":  "Width"
+                                             },
+                                   "height":  {
+                                                 "node_id":  "5645",
+                                                 "input_key":  "height",
+                                                 "type":  "number",
+                                                 "label":  "Height"
+                                             },
                                    "length_seconds":  {
                                                           "node_id":  "5646",
                                                           "input_key":  "value",
@@ -1552,7 +1564,19 @@
                                                              "input_key":  "strength_model",
                                                              "type":  "number",
                                                              "label":  "LoRA Strength"
-                                                         }
+                                                         },
+                                       "width":  {
+                                                     "node_id":  "4995",
+                                                     "input_key":  "width",
+                                                     "type":  "number",
+                                                     "label":  "Width"
+                                                 },
+                                       "height":  {
+                                                     "node_id":  "4995",
+                                                     "input_key":  "height",
+                                                     "type":  "number",
+                                                     "label":  "Height"
+                                                 }
                                    }
                     }
 }

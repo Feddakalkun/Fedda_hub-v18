@@ -72,6 +72,15 @@ OUTPUT_DIR = COMFY_DIR / "output"
 COMFY_URL = os.environ.get("COMFY_URL", "http://127.0.0.1:8199")
 MOCKINGBIRD_URL = os.environ.get("MOCKINGBIRD_URL", "http://127.0.0.1:8020")
 AGENT_DB_PATH = CONFIG_DIR / "agent_memory.db"
+
+def _comfy_proxy_error() -> str:
+    return (
+        "ComfyUI is not reachable on 127.0.0.1:8199. "
+        "The separate 'FEDDA ComfyUI Console' cmd window must remain open. "
+        "Wait for it to print 'Starting server' followed by 'To see the GUI go to: http://127.0.0.1:8199' "
+        "(this can take 30-120s on first launch while loading custom nodes). "
+        "If you see errors or the window closed, restart via run.bat."
+    )
 WORKFLOW_MEMORY_PATH = CONFIG_DIR / "workflow_memory.json"
 MEMORY_REFRESH_EVERY_TURNS = 2
 
@@ -239,6 +248,8 @@ async def comfy_status():
         resp = requests.get(f"{COMFY_URL}/system_stats", timeout=1.5)
         return {"success": True, "online": resp.ok, "status_code": resp.status_code}
     except Exception as e:
+        if isinstance(e, requests_exceptions.ConnectionError):
+            return {"success": True, "online": False, "error": _comfy_proxy_error()}
         return {"success": True, "online": False, "error": str(e)}
 
 
@@ -670,7 +681,7 @@ def _fetch_fish_models_state() -> Dict[str, Any]:
         }
     except Exception as exc:
         if isinstance(exc, requests_exceptions.ConnectionError):
-            msg = "ComfyUI is offline on 127.0.0.1:8199. Start ComfyUI first."
+            msg = _comfy_proxy_error()
         else:
             msg = str(exc)
         return {
@@ -1184,6 +1195,8 @@ async def download_chat_fish_model(req: FishModelDownloadRequest):
         if not prompt_id:
             return {"success": False, "error": "ComfyUI did not return prompt_id."}
         return {"success": True, "prompt_id": prompt_id, "model_path": selected_model}
+    except requests_exceptions.ConnectionError:
+        return {"success": False, "error": _comfy_proxy_error()}
     except Exception as exc:
         return {"success": False, "error": str(exc)}
 
@@ -1301,6 +1314,8 @@ async def chat_tts(req: TtsRequest):
             time.sleep(0.8)
 
         return {"success": False, "error": "Timed out waiting for local TTS output."}
+    except requests_exceptions.ConnectionError:
+        return {"success": False, "error": _comfy_proxy_error()}
     except Exception as e:
         return {"success": False, "error": f"Local TTS failed: {e}"}
 
@@ -1359,6 +1374,8 @@ async def refresh_models():
     try:
         resp = requests.post(f"{COMFY_URL}/api/models/refresh", timeout=5)
         return {"success": resp.ok}
+    except requests_exceptions.ConnectionError:
+        return {"success": False, "error": _comfy_proxy_error()}
     except Exception as e:
         return {"success": False, "error": str(e)}
 
@@ -2232,7 +2249,10 @@ async def upload_file(file: UploadFile = File(...)):
         resp.raise_for_status()
         data = resp.json()
         return {"success": True, "filename": data.get("name", file.filename)}
+    except requests_exceptions.ConnectionError:
+        raise HTTPException(status_code=503, detail=_comfy_proxy_error())
     except Exception as e:
+        # Keep other errors (e.g. bad response from Comfy) but avoid dumping raw ConnectionPool spam
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -2719,6 +2739,8 @@ async def generate(req: GenerateRequest):
         }
     except HTTPException:
         raise
+    except requests_exceptions.ConnectionError:
+        raise HTTPException(status_code=503, detail=_comfy_proxy_error())
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -2893,6 +2915,8 @@ async def get_generation_status(prompt_id: str, workflow_id: str = ""):
         if fallback_images:
             return {"success": True, "status": "completed", "images": fallback_images, "videos": [], "audios": [], "fallback": True}
         return {"success": True, "status": "not_found", "images": [], "videos": [], "audios": []}
+    except requests_exceptions.ConnectionError:
+        return {"success": False, "error": _comfy_proxy_error()}
     except Exception as e:
         return {"success": False, "error": str(e)}
 

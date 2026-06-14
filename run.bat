@@ -1,4 +1,4 @@
-﻿@echo off
+@echo off
 setlocal EnableExtensions EnableDelayedExpansion
 chcp 65001 >nul
 cd /d "%~dp0"
@@ -122,7 +122,28 @@ if errorlevel 1 (
 )
 call :wait_for_port 8199 60 ComfyUI
 
+:: Extra HTTP readiness probe for Comfy (avoids upload/generate races while nodes finish loading)
+echo     Waiting for ComfyUI HTTP /system_stats to respond...
+powershell -NoProfile -ExecutionPolicy Bypass -Command ^
+  "$url='http://127.0.0.1:8199/system_stats'; $max=40; $i=0; " ^
+  "while ($i -lt $max) { " ^
+  "  try { " ^
+  "    $r = Invoke-WebRequest -Uri $url -UseBasicParsing -TimeoutSec 3 -ErrorAction Stop; " ^
+  "    if ($r.StatusCode -eq 200) { Write-Host '    [OK] ComfyUI is HTTP-ready.'; exit 0 } " ^
+  "  } catch { " ^
+  "    if ($i % 3 -eq 0) { Write-Host \"    ... still initializing ComfyUI (port open, server warming up) ($i/$max)\" } " ^
+  "  }; " ^
+  "  $i++; Start-Sleep -Seconds 2 " ^
+  "}; " ^
+  "Write-Host '    [WARN] ComfyUI HTTP not confirmed within timeout. Uploads/generates may briefly fail until it finishes loading custom nodes.'; exit 1"
+if errorlevel 1 (
+    echo     (ComfyUI may need a few more seconds; the UI status indicator will turn green when ready.)
+) else (
+    echo     ComfyUI ready for API calls.
+)
+
 :: 4. Start FastAPI Backend
+
 echo [4/4] Starting Backend (Port 8000)...
 call :is_port_listening 8000
 if errorlevel 1 (
@@ -156,14 +177,14 @@ exit /b
 :: Returns errorlevel 1 when listening, 0 when not listening.
 :: ============================================================================
 :is_port_listening
-setlocal
-set "CHECK_PORT=%~1"
-for /f "tokens=5" %%a in ('netstat -ano 2^>nul ^| findstr /R /C:":%CHECK_PORT% .*LISTENING"') do (
-    endlocal
-    exit /b 1
+@setlocal
+@set "CHECK_PORT=%~1"
+@for /f "tokens=5" %%a in ('netstat -ano 2^>nul ^| findstr /R /C:":%CHECK_PORT% .*LISTENING"') do (
+    @endlocal
+    @exit /b 1
 )
-endlocal
-exit /b 0
+@endlocal
+@exit /b 0
 
 :: ============================================================================
 :: SUBROUTINE: CLEAN UP STALE FEDDA SERVICE PROCESSES
@@ -190,27 +211,28 @@ exit /b
 :: SUBROUTINE: WAIT FOR TCP PORT LISTENING
 :: ============================================================================
 :wait_for_port
-setlocal EnableDelayedExpansion
-set "WAIT_PORT=%~1"
-set "WAIT_MAX=%~2"
-set "WAIT_NAME=%~3"
-set /a WAIT_ELAPSED=0
+@setlocal EnableDelayedExpansion
+@set "WAIT_PORT=%~1"
+@set "WAIT_MAX=%~2"
+@set "WAIT_NAME=%~3"
+@echo     Waiting for %WAIT_NAME% on port %WAIT_PORT% ...
+@set /a WAIT_ELAPSED=0
 
 :wait_loop
-for /f "tokens=5" %%a in ('netstat -ano 2^>nul ^| findstr /R /C:":%WAIT_PORT% .*LISTENING"') do (
-    endlocal
-    exit /b 0
+@for /f "tokens=5" %%a in ('netstat -ano 2^>nul ^| findstr /R /C:":%WAIT_PORT% .*LISTENING"') do (
+    @endlocal
+    @exit /b 0
 )
 
-if !WAIT_ELAPSED! GEQ !WAIT_MAX! (
-    echo     [WARN] %WAIT_NAME% did not become ready within %WAIT_MAX%s. Continuing...
-    endlocal
-    exit /b 1
+@if !WAIT_ELAPSED! GEQ !WAIT_MAX! (
+    @echo     [WARN] %WAIT_NAME% did not become ready within %WAIT_MAX%s. Continuing...
+    @endlocal
+    @exit /b 1
 )
 
-timeout /t 1 /nobreak >nul
-set /a WAIT_ELAPSED+=1
-goto :wait_loop
+@timeout /t 5 /nobreak >nul
+@set /a WAIT_ELAPSED+=5
+@goto :wait_loop
 
 :: ============================================================================
 :: SUBROUTINE: DETECT ENVIRONMENT (Portable vs Lite)
@@ -310,13 +332,20 @@ for /f "tokens=5" %%a in ('netstat -aon 2^>nul ^| findstr ":8199"') do (taskkill
 timeout /t 1 /nobreak >nul
 
 cd /d "%COMFYUI_DIR%"
+if not exist "%BASE_DIR%\logs" mkdir "%BASE_DIR%\logs"
+set "COMFY_LOG=%BASE_DIR%\logs\comfyui_latest.log"
 echo [%date% %time%] Starting ComfyUI...
-"%PYTHON%" -W ignore::FutureWarning -s -u main.py %COMFY_EXTRA_FLAGS% --port 8199 --listen 127.0.0.1 --reserve-vram 4 --disable-cuda-malloc --enable-cors-header * --preview-method auto --disable-auto-launch --enable-manager --enable-manager-legacy-ui
+echo [%date% %time%] Live output in this window. Full log also written to: %COMFY_LOG%
+echo [%date% %time%] (Close this window only after shutting down FEDDA)
+(
+  "%PYTHON%" -W ignore::FutureWarning -s -u main.py %COMFY_EXTRA_FLAGS% --port 8199 --listen 127.0.0.1 --reserve-vram 4 --disable-cuda-malloc --enable-cors-header * --preview-method auto --disable-auto-launch --enable-manager --enable-manager-legacy-ui
+) 2>&1 | powershell -NoProfile -Command "$input | Tee-Object -FilePath '%COMFY_LOG%' -Append | Out-Host"
 
 if %errorlevel% neq 0 (
-    echo [%date% %time%] [ERROR] ComfyUI crashed with error code %errorlevel%
+    echo [%date% %time%] [ERROR] ComfyUI exited with code %errorlevel%
 )
 exit /b
+
 
 :: ============================================================================
 :: SUBROUTINE: BACKEND

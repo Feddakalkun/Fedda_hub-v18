@@ -10,6 +10,7 @@ import { comfyService } from '../../services/comfyService';
 import { FeddaButton, FeddaSectionTitle } from '../../components/ui/FeddaPrimitives';
 import { WorkflowWorkbench } from '../../components/layout/WorkflowWorkbench';
 import { WorkflowVideoPreviewStrip } from '../../components/layout/WorkflowVideoPreviewStrip';
+import { LTX_RATIOS, getLtxDimensions } from '../../config/ltx';
 
 function RefImageSlot({ preview, uploading, onFile }: {
   preview: string | null;
@@ -65,11 +66,14 @@ export const LtxImg2VidPage = () => {
   const [seed, setSeed] = usePersistentState('ltx_img2vid_seed', -1);
   const [loraName, setLoraName] = usePersistentState('ltx_img2vid_lora_name', '');
   const [loraStrength, setLoraStrength] = usePersistentState('ltx_img2vid_lora_strength', 0.65);
+  const [aspectRatio, setAspectRatio] = usePersistentState('ltx_img2vid_ar', '16:9');
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [imageFilename, setImageFilename] = usePersistentState<string | null>('ltx_img2vid_image_file', null);
   const [imageUploading, setImageUploading] = useState(false);
   const [referenceCaptioning, setReferenceCaptioning] = useState(false);
   const [availableLoras, setAvailableLoras] = useState<string[]>([]);
+
+  const ratios = LTX_RATIOS;
 
   const { toast } = useToast();
   const run = useWorkflowRun({
@@ -145,10 +149,13 @@ export const LtxImg2VidPage = () => {
 
   const handleGenerate = () => {
     if (!imageFilename || !prompt.trim() || run.isGenerating) return;
+    const dims = getLtxDimensions(aspectRatio);
     run.start({
       image: imageFilename,
       prompt: prompt.trim(),
       negative: negative.trim(),
+      width: dims.width,
+      height: dims.height,
       seed: seed === -1 ? Math.floor(Math.random() * 10_000_000_000) : seed,
       ...(loraName ? { lora_name: loraName, lora_strength: loraStrength } : {}),
     });
@@ -269,6 +276,27 @@ export const LtxImg2VidPage = () => {
                 <span className="w-10 text-right font-mono text-white/65">{loraStrength.toFixed(2)}</span>
               </div>
             )}
+          </div>
+
+          {/* Stable aspect / resolution control for LTX (fixes constant 1:1 output) */}
+          <div className="space-y-1.5 pt-1">
+            <p className="text-[8px] font-black uppercase tracking-widest text-white/25">Output Format (w×h snapped to ×32)</p>
+            <div className="flex flex-wrap gap-1">
+              {ratios.map((r) => (
+                <button
+                  key={r}
+                  onClick={() => setAspectRatio(r)}
+                  className={`rounded-md border px-2 py-0.5 text-[9px] font-black tracking-widest transition-all ${
+                    aspectRatio === r ? 'border-white/30 bg-white/10 text-white' : 'border-white/10 bg-white/[0.02] text-white/40 hover:text-white/70'
+                  }`}
+                >
+                  {r}
+                </button>
+              ))}
+            </div>
+            <div className="font-mono text-[9px] text-white/35">
+              {getLtxDimensions(aspectRatio).width}×{getLtxDimensions(aspectRatio).height}
+            </div>
           </div>
         </div>
 
